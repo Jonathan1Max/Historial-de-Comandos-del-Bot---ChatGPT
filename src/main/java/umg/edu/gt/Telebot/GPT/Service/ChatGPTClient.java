@@ -14,7 +14,7 @@ import java.util.Map;
 @Component
 public class ChatGPTClient {
 
-    private final String API_KEY = "";
+    private final String API_KEY = "KEY";
     private final RestTemplate restTemplate;
 
     public ChatGPTClient(RestTemplate restTemplate) {
@@ -22,7 +22,7 @@ public class ChatGPTClient {
     }
 
     public String getChatGPTResponse(String userMessage) {
-        String apiUrl = "apigpt";
+        String apiUrl = "APIGPT";
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + API_KEY);

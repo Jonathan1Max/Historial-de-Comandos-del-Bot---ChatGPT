@@ -1,22 +1,31 @@
 package umg.edu.gt.Telebot.GPT.Model;
 
+import jakarta.persistence.*;
+import lombok.Data;
+import java.util.List;
+
+@Entity
+@Data
 public class Message {
-    private String role;
-    private String content;
 
-    public String getRole() {
-        return role;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String text;
+
+    @OneToMany(mappedBy = "message", fetch = FetchType.LAZY)
+    private List<BotCommand> botCommands;
+
+    public Message() {
     }
 
-    public void setRole(String role) {
-        this.role = role;
+    public Message(String text) {
+        this.text = text;
     }
 
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
+    public Message(Long id, String text) {
+        this.id = id;
+        this.text = text;
     }
 }

@@ -4,7 +4,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import umg.edu.gt.Telebot.GPT.Model.Client;
 import umg.edu.gt.Telebot.GPT.Repository.ClientRepository;
-
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,14 +22,17 @@ public class BotService {
     private final ChatGPTClient chatGPTClient;
     private final ClientRepository clientRepository;
     private final RequestRepository requestRepository;
+    private final BotCommandService botCommandService;
     private final RestTemplate restTemplate;
     
     @Autowired
     public BotService(ChatGPTClient chatGPTClient, ClientRepository clientRepository, 
-                      RequestRepository requestRepository, RestTemplate restTemplate) {
+                      RequestRepository requestRepository, BotCommandService botCommandService, 
+                      RestTemplate restTemplate) {
         this.chatGPTClient = chatGPTClient;
         this.clientRepository = clientRepository;
         this.requestRepository = requestRepository;
+        this.botCommandService = botCommandService;
         this.restTemplate = restTemplate;
     }
 
@@ -66,33 +68,35 @@ public class BotService {
             Map<String, Object> chat = (Map<String, Object>) message.get("chat");
             long chatId = ((Number) chat.get("id")).longValue();
             String text = (String) message.get("text");
-            
-            Client client = clientRepository.getById(chatId);
-                         
-            if (client != null) {
-                System.out.println("Cliente encontrado: " + client.getName());
-                String response = processUserMessage(text);
-                sendTelegramMessage(chatId, response);
+            Long messageId = ((Number) message.get("message_id")).longValue();
+
+            if (text.startsWith("/")) {
+                handleCommand(chatId, text, messageId);
             } else {
-                if (text.equalsIgnoreCase("/start")) {
-                    sendTelegramMessage(chatId, "¡Bienvenido! ¿Cómo te llamas?");
-                    setAskingName(chatId, true);
-                } else if (isAskingName(chatId)) {
-                    setUserName(chatId, text);
-                    clientRepository.add(text, chatId);
-
-                    Client newClient = clientRepository.getById(chatId);
-
-                    if (newClient != null) {
-                        sendTelegramMessage(chatId, "¡Hola " + newClient.getName() + ", en qué te puedo ayudar hoy?");
-                    } else {
-                        sendTelegramMessage(chatId, "¡Gracias! Tu nombre ha sido guardado.");
-                    }
-
-                    setAskingName(chatId, false);
-                } else {
+                Client client = clientRepository.getById(chatId);
+                if (client != null) {
                     String response = processUserMessage(text);
                     sendTelegramMessage(chatId, response);
+                } else {
+                    if (text.equalsIgnoreCase("/start")) {
+                        sendTelegramMessage(chatId, "¡Bienvenido! ¿Cómo te llamas?");
+                        setAskingName(chatId, true);
+                    } else if (isAskingName(chatId)) {
+                        setUserName(chatId, text);
+                        clientRepository.add(text, chatId);
+
+                        Client newClient = clientRepository.getById(chatId);
+                        if (newClient != null) {
+                            sendTelegramMessage(chatId, "¡Hola " + newClient.getName() + ", en qué te puedo ayudar hoy?");
+                        } else {
+                            sendTelegramMessage(chatId, "¡Gracias! Tu nombre ha sido guardado.");
+                        }
+
+                        setAskingName(chatId, false);
+                    } else {
+                        String response = processUserMessage(text);
+                        sendTelegramMessage(chatId, response);
+                    }
                 }
             }
         } else {
@@ -100,15 +104,29 @@ public class BotService {
         }
     }
 
-        public String processUserMessage(String userMessage) {
+        private void handleCommand(Long chatId, String command, Long messageId) {
+        String responseMessage = "";
+        String additionalInfo = "";
+
+        if (command.equalsIgnoreCase("/help")) {
+            responseMessage = "Este es el comando /help. ¿En qué puedo ayudarte?";
+        } else if (command.equalsIgnoreCase("/info")) {
+            responseMessage = "Este es el comando /info. Aquí va la información sobre el bot.";
+        }
+
+        sendTelegramMessage(chatId, responseMessage);
+
+        botCommandService.saveBotCommand(command, chatId, messageId, responseMessage, additionalInfo);
+    }
+
+    public String processUserMessage(String userMessage) {
         String storedResponse = requestRepository.getResponseByQuestion(userMessage);
         if (storedResponse != null) {
-            return storedResponse;
+            return storedResponse;  
         }
 
         String response = chatGPTClient.getChatGPTResponse(userMessage);
         if (response != null) {
-
             requestRepository.saveRequest(userMessage, response);
             return response;
         }
